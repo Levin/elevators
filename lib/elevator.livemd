@@ -1,0 +1,140 @@
+# Elevators
+
+## Elevator
+
+```elixir
+defmodule Elevator do
+  use GenServer
+  require Logger
+
+  def info(e_nr) do
+    GenServer.call(e_nr, :info)
+  end
+
+  def up_floor(e_nr) do
+    GenServer.call(e_nr, :up_floor)
+  end
+
+  def down_floor(e_nr) do
+    GenServer.call(e_nr, :down_floor)
+  end
+
+  def new_driver(e_nr, n \\ 1) do
+    GenServer.cast(e_nr, {:add_driver, n})
+  end
+
+  def remove_driver(e_nr, n \\ 1) do
+    GenServer.cast(e_nr, {:remove_driver, n})
+  end
+
+  def move?(e_nr, run?) do
+    GenServer.cast(e_nr, {:move, run?})
+  end
+
+  def start_link(e_nr, max_floor) do
+    GenServer.start_link(__MODULE__, %{max_floor: max_floor}, name: build_name(e_nr))
+  end
+
+  @impl true
+  def init(params) do
+    # build state 
+    state = %{floor: 1, drivers: 0, time_to_top: nil, move?: false, max_floor: params.max_floor}
+
+    {:ok, state}
+  end
+
+  @impl true
+  def handle_call(:info, _from, state) do
+    {:reply, state, state}
+  end
+
+  @impl true
+  def handle_call(:up_floor, _from, state) do
+    new_floor = state.floor + 1
+    {:reply, new_floor, %{state | floor: new_floor}}
+  end
+
+  @impl true
+  def handle_call(:down_floor, _from, state) do
+    new_floor = state.floor - 1
+    {:reply, new_floor, %{state | floor: new_floor}}
+  end
+
+  def handle_cast({:add_driver, amount}, state) do
+    new_drivers = state.drivers + amount
+    {:noreply, %{state | drivers: new_drivers}}
+  end
+
+  def handle_cast({:remove_driver, amount}, state) do
+    new_drivers = state.drivers - amount
+    {:noreply, %{state | drivers: new_drivers}}
+  end
+
+  def handle_cast({:move, value}, state) do
+    case value do
+      true -> {:noreply, %{state | move?: true}}
+      false -> {:noreply, %{state | move?: false}}
+    end
+  end
+
+  def build_name(number) do
+    "elevator_#{number}"
+    |> String.to_atom()
+  end
+end
+```
+
+## House
+
+This is the controller for the Elevators. A house can have a finite number of elevators, which will be handeled through the house module
+
+```elixir
+defmodule House do
+  use GenServer
+
+  def add_elevator(house, e_nr, max_floor) do
+    GenServer.cast(build_housename(house), {:new_elevator, {e_nr, max_floor}})
+  end
+
+  def info(house) do
+    GenServer.call(build_housename(house), :info)
+  end
+
+  def start_link(housename) do
+    GenServer.start_link(__MODULE__, %{elevators: []}, name: build_housename(housename))
+  end
+
+  def init(state) do
+    {:ok, state}
+  end
+
+  def handle_call(:info, _from, state) do
+    {:reply, state, state}
+  end
+
+  def handle_cast({:new_elevator, {e_nr, floor}}, state) do
+    new_elevator = Elevator.start_link(e_nr, floor)
+    new_state = %{state | elevators: [new_elevator | state.elevators]}
+    {:noreply, new_state}
+  end
+
+  def terminate(reason, state) do
+    IO.inspect("terminate/2 callback")
+    IO.inspect({:reason, reason})
+    IO.inspect({:state, state})
+  end
+
+  defp build_housename(name) do
+    name
+    |> String.to_atom()
+  end
+end
+```
+
+## Buildup / Testing
+
+```elixir
+House.start_link("The One")
+House.add_elevator("The One", 1, 32)
+House.info("The One")
+```
