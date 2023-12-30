@@ -45,18 +45,30 @@ defmodule Elevator do
 
   @impl true
   def handle_call({:up_floor, floors}, _from, state) do
+    max_speed = 10
+    up_floors = 
+      cond do
+        floors > 5 -> 
+          acc = 3 * (10*0.65)
+          break = 2 * (10*0.5)
+          normal = (floors - 5) * max_speed
+          acc + break + normal
+        floors == 1 -> 
+          1 * 10
+        true -> 
+          breaks = div(floors,2)
+          accs = floors - breaks
 
-      # defualt speped when accelerated: 5 mp/h -> 8 km/h
+          breaks * (10 * 0.5) + accs * (10 * 0.65)
+      end
 
-      # for accelaration we need 3 floors => speed * 0.65
-      # for breaking, we need 2 floors => speed * 0.5
-
-    new_floor = state.floor + floors
+    new_floor = up_floors + state.floor
     {:reply, new_floor, %{state | floor: new_floor}}
   end
 
   @impl true
   def handle_call({:down_floor, floors}, _from, state) do
+    max_speed = 10
     new_floor = state.floor - floors
     {:reply, new_floor, %{state | floor: new_floor}}
   end
